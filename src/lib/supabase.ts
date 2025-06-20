@@ -3,8 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 // For development, we'll use placeholder values that won't break the app
 /* const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'; */
-const supabaseUrl = "https://dnreakbkdhslqrsqdslj.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRucmVha2JrZGhzbHFyc3Fkc2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzNDMxNTQsImV4cCI6MjA2NTkxOTE1NH0.uijN8qtR_3Q57ZLKmXj609gkAquPpC3pKSk6_4DUu40";
 
 // Check if we're using placeholder/mock values
 const isUsingMockClient = 
