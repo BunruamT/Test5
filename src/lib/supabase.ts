@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // For development, we'll use placeholder values that won't break the app
-/* const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'; */
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'; 
 
 // Check if we're using placeholder/mock values
 const isUsingMockClient = 
