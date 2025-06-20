@@ -4,9 +4,18 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
+// Check if we're using placeholder/mock values
+const isUsingMockClient = 
+  !supabaseUrl || 
+  !supabaseAnonKey || 
+  supabaseUrl === 'https://your-project.supabase.co' ||
+  supabaseUrl === 'https://placeholder.supabase.co' ||
+  supabaseAnonKey === 'your-anon-key-here' ||
+  supabaseAnonKey === 'placeholder-key';
+
 // Create a mock client if no real credentials are provided
 const createSupabaseClient = () => {
-  if (supabaseUrl === 'https://placeholder.supabase.co' || supabaseAnonKey === 'placeholder-key') {
+  if (isUsingMockClient) {
     console.warn('⚠️ Using mock Supabase client. Please set up your Supabase credentials in .env file');
     
     // Return a mock client for development
@@ -22,7 +31,14 @@ const createSupabaseClient = () => {
                 email, 
                 user_metadata: options?.data || {} 
               }, 
-              session: null 
+              session: {
+                user: { 
+                  id: 'mock-user-id', 
+                  email, 
+                  user_metadata: options?.data || {} 
+                },
+                access_token: 'mock-token'
+              }
             }, 
             error: null 
           };
@@ -57,6 +73,8 @@ const createSupabaseClient = () => {
         },
         onAuthStateChange: (callback: any) => {
           console.log('Mock onAuthStateChange');
+          // Call the callback immediately with no session for initial state
+          setTimeout(() => callback('SIGNED_OUT', null), 0);
           return { data: { subscription: { unsubscribe: () => {} } } };
         },
         getUser: async () => {
@@ -64,18 +82,34 @@ const createSupabaseClient = () => {
         }
       },
       from: (table: string) => ({
-        select: () => ({
-          eq: () => ({
+        select: (columns?: string) => ({
+          eq: (column: string, value: any) => ({
+            single: async () => ({ data: null, error: null }),
+            then: async (callback: any) => callback({ data: [], error: null })
+          }),
+          then: async (callback: any) => callback({ data: [], error: null })
+        }),
+        insert: (data: any) => ({ 
+          select: () => ({
             single: async () => ({ data: null, error: null })
+          }),
+          then: async (callback: any) => callback({ data: null, error: null })
+        }),
+        update: (data: any) => ({ 
+          eq: (column: string, value: any) => ({ 
+            then: async (callback: any) => callback({ data: null, error: null })
           })
         }),
-        insert: () => ({ error: null }),
-        update: () => ({ eq: () => ({ error: null }) })
+        delete: () => ({
+          eq: (column: string, value: any) => ({
+            then: async (callback: any) => callback({ data: null, error: null })
+          })
+        })
       }),
       storage: {
-        from: () => ({
-          upload: async () => ({ data: null, error: null }),
-          getPublicUrl: () => ({ data: { publicUrl: 'mock-url' } })
+        from: (bucket: string) => ({
+          upload: async (path: string, file: File) => ({ data: { path }, error: null }),
+          getPublicUrl: (path: string) => ({ data: { publicUrl: `mock-url/${path}` } })
         })
       }
     } as any;
