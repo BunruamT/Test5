@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Eye, EyeOff, Mail, Lock, User, Building2, Car } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'customer-register' | 'owner-register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,32 +19,51 @@ export const LoginPage: React.FC = () => {
     businessAddress: ''
   });
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
     
-    if (mode !== 'login' && formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
-      return;
-    }
-
-    // In a real app, this would handle authentication
-    console.log('Form submitted:', { mode, formData });
-    
-    // Simulate successful login/registration and redirect based on account type
-    if (mode === 'owner-register') {
-      // Property owner registration - go to admin dashboard
-      navigate('/admin');
-    } else if (mode === 'login') {
-      // For login, check email patterns to determine account type
-      if (formData.email.includes('owner') || formData.email.includes('admin') || formData.email.includes('property')) {
-        navigate('/admin');
-      } else {
-        navigate('/');
+    try {
+      if (mode !== 'login' && formData.password !== formData.confirmPassword) {
+        throw new Error('Passwords do not match');
       }
-    } else {
-      // Customer registration - go to main app
-      navigate('/');
+
+      if (mode === 'login') {
+        await signIn(formData.email, formData.password);
+        
+        // Determine redirect based on email patterns for demo
+        if (formData.email.includes('owner') || formData.email.includes('admin') || formData.email.includes('property')) {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+      } else {
+        // Registration
+        const userData = {
+          name: formData.name,
+          phone: formData.phone,
+          role: mode === 'owner-register' ? 'owner' : 'user',
+          businessName: formData.businessName,
+          businessAddress: formData.businessAddress
+        };
+
+        await signUp(formData.email, formData.password, userData);
+        
+        // After successful registration
+        if (mode === 'owner-register') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+      }
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      setError(error.message || 'An error occurred during authentication');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,6 +84,7 @@ export const LoginPage: React.FC = () => {
       businessName: '',
       businessAddress: ''
     });
+    setError(null);
   };
 
   const switchMode = (newMode: typeof mode) => {
@@ -152,6 +175,13 @@ export const LoginPage: React.FC = () => {
               {mode === 'owner-register' && 'Start monetizing your parking spaces today'}
             </p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name Field (Registration only) */}
@@ -350,11 +380,21 @@ export const LoginPage: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              {mode === 'login' && 'Sign In'}
-              {mode === 'customer-register' && 'Create Driver Account'}
-              {mode === 'owner-register' && 'Create Owner Account'}
+              {loading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Please wait...</span>
+                </div>
+              ) : (
+                <>
+                  {mode === 'login' && 'Sign In'}
+                  {mode === 'customer-register' && 'Create Driver Account'}
+                  {mode === 'owner-register' && 'Create Owner Account'}
+                </>
+              )}
             </button>
           </form>
 
@@ -415,7 +455,7 @@ export const LoginPage: React.FC = () => {
         <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
           <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-            Demo Credentials
+            Demo Credentials (Mock Mode)
           </h4>
           <div className="text-sm text-blue-800 space-y-2">
             <div className="flex justify-between items-center">
@@ -427,6 +467,9 @@ export const LoginPage: React.FC = () => {
               <span className="font-mono text-xs bg-blue-100 px-2 py-1 rounded">demo123</span>
             </div>
           </div>
+          <p className="text-xs text-blue-600 mt-2">
+            ⚠️ Currently in mock mode. Set up Supabase credentials to enable real authentication.
+          </p>
         </div>
 
         {/* Features Preview */}

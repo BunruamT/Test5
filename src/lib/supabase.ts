@@ -1,13 +1,90 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// For development, we'll use placeholder values that won't break the app
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+// Create a mock client if no real credentials are provided
+const createSupabaseClient = () => {
+  if (supabaseUrl === 'https://placeholder.supabase.co' || supabaseAnonKey === 'placeholder-key') {
+    console.warn('⚠️ Using mock Supabase client. Please set up your Supabase credentials in .env file');
+    
+    // Return a mock client for development
+    return {
+      auth: {
+        signUp: async ({ email, password, options }: any) => {
+          console.log('Mock signUp:', { email, password, options });
+          // Simulate successful signup
+          return { 
+            data: { 
+              user: { 
+                id: 'mock-user-id', 
+                email, 
+                user_metadata: options?.data || {} 
+              }, 
+              session: null 
+            }, 
+            error: null 
+          };
+        },
+        signInWithPassword: async ({ email, password }: any) => {
+          console.log('Mock signIn:', { email, password });
+          // Simulate successful login
+          const mockUser = {
+            id: email.includes('owner') || email.includes('admin') ? 'mock-owner-id' : 'mock-user-id',
+            email,
+            user_metadata: {
+              role: email.includes('owner') || email.includes('admin') ? 'owner' : 'user'
+            }
+          };
+          return { 
+            data: { 
+              user: mockUser, 
+              session: { 
+                user: mockUser,
+                access_token: 'mock-token'
+              } 
+            }, 
+            error: null 
+          };
+        },
+        signOut: async () => {
+          console.log('Mock signOut');
+          return { error: null };
+        },
+        getSession: async () => {
+          return { data: { session: null }, error: null };
+        },
+        onAuthStateChange: (callback: any) => {
+          console.log('Mock onAuthStateChange');
+          return { data: { subscription: { unsubscribe: () => {} } } };
+        },
+        getUser: async () => {
+          return { data: { user: null }, error: null };
+        }
+      },
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: null, error: null })
+          })
+        }),
+        insert: () => ({ error: null }),
+        update: () => ({ eq: () => ({ error: null }) })
+      }),
+      storage: {
+        from: () => ({
+          upload: async () => ({ data: null, error: null }),
+          getPublicUrl: () => ({ data: { publicUrl: 'mock-url' } })
+        })
+      }
+    } as any;
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createSupabaseClient();
 
 // Types
 export interface Profile {

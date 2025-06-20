@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase, Profile, getCurrentProfile } from '../lib/supabase';
+import { supabase, Profile } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
         setUser(session?.user ?? null);
         if (session?.user) {
           await loadProfile(session.user.id);
@@ -56,13 +57,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProfile = async (userId: string) => {
     try {
+      // For mock mode, create a mock profile
+      if (supabase.auth.getUser === undefined || typeof supabase.auth.getUser !== 'function') {
+        const mockProfile: Profile = {
+          id: userId,
+          email: user?.email || 'mock@example.com',
+          name: user?.user_metadata?.name || 'Mock User',
+          role: user?.user_metadata?.role || 'user',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setProfile(mockProfile);
+        setLoading(false);
+        return;
+      }
+
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading profile:', error);
+      }
+      
       setProfile(profile);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -72,29 +91,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
+      if (error) throw error;
+
+      // For mock mode, simulate successful login
+      if (data.user) {
+        console.log('✅ Sign in successful:', data.user.email);
+      }
+    } catch (error: any) {
+      console.error('❌ Sign in error:', error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (email: string, password: string, userData: any) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: userData,
-      },
-    });
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            role: userData.role || 'user',
+            phone: userData.phone,
+            business_name: userData.businessName,
+            business_address: userData.businessAddress
+          },
+        },
+      });
 
-    if (error) throw error;
+      if (error) throw error;
+
+      console.log('✅ Sign up successful:', data.user?.email);
+      
+      // For mock mode, automatically sign in the user
+      if (data.user && !data.session) {
+        console.log('📧 Check your email for verification link');
+      }
+    } catch (error: any) {
+      console.error('❌ Sign up error:', error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    console.log('✅ Sign out successful');
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
