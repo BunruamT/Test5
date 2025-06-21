@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, userData: any) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -78,13 +79,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, this is normal for new users
+          console.log('Profile not found, user may need to complete setup');
+        } else {
+          console.error('Error loading profile:', error);
+        }
+        setProfile(null);
+      } else {
+        setProfile(profile);
       }
-      
-      setProfile(profile);
     } catch (error) {
       console.error('Error loading profile:', error);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -98,7 +106,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in. Check your spam folder if you don\'t see the email.');
+        }
+        throw error;
+      }
 
       // For mock mode, simulate successful login
       if (data.user) {
@@ -135,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // For mock mode, automatically sign in the user
       if (data.user && !data.session) {
-        console.log('📧 Check your email for verification link');
+        console.log('📧 Please check your email and click the confirmation link to complete your registration');
       }
     } catch (error: any) {
       console.error('❌ Sign up error:', error.message);
@@ -165,6 +179,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await loadProfile(user.id);
   };
 
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    });
+
+    if (error) throw error;
+    console.log('✅ Confirmation email resent');
+  };
+
   const value = {
     user,
     profile,
@@ -173,6 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     updateProfile,
+    resendConfirmation,
   };
 
   return (

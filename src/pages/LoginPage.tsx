@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, Eye, EyeOff, Mail, Lock, User, Building2, Car } from 'lucide-react';
+import { MapPin, Eye, EyeOff, Mail, Lock, User, Building2, Car, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
@@ -9,6 +9,8 @@ export const LoginPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,7 +21,7 @@ export const LoginPage: React.FC = () => {
     businessAddress: ''
   });
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resendConfirmation } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,16 +54,33 @@ export const LoginPage: React.FC = () => {
 
         await signUp(formData.email, formData.password, userData);
         
-        // After successful registration
-        if (mode === 'owner-register') {
-          navigate('/admin');
-        } else {
-          navigate('/');
-        }
+        // Show email confirmation message
+        setPendingEmail(formData.email);
+        setShowEmailConfirmation(true);
       }
     } catch (error: any) {
       console.error('Authentication error:', error);
-      setError(error.message || 'An error occurred during authentication');
+      
+      // Handle specific error cases
+      if (error.message.includes('Email not confirmed') || error.message.includes('check your email')) {
+        setPendingEmail(formData.email);
+        setShowEmailConfirmation(true);
+        setError(null); // Don't show error, show confirmation message instead
+      } else {
+        setError(error.message || 'An error occurred during authentication');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    try {
+      setLoading(true);
+      await resendConfirmation(pendingEmail);
+      setError(null);
+    } catch (error: any) {
+      setError(error.message || 'Failed to resend confirmation email');
     } finally {
       setLoading(false);
     }
@@ -85,12 +104,85 @@ export const LoginPage: React.FC = () => {
       businessAddress: ''
     });
     setError(null);
+    setShowEmailConfirmation(false);
+    setPendingEmail('');
   };
 
   const switchMode = (newMode: typeof mode) => {
     setMode(newMode);
     resetForm();
   };
+
+  // Show email confirmation screen
+  if (showEmailConfirmation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail className="h-8 w-8 text-blue-600" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Check Your Email
+            </h2>
+            
+            <p className="text-gray-600 mb-6">
+              We've sent a confirmation link to <strong>{pendingEmail}</strong>. 
+              Please click the link in your email to complete your {mode === 'login' ? 'sign in' : 'registration'}.
+            </p>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Don't see the email?</p>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>Check your spam or junk folder</li>
+                    <li>Make sure you entered the correct email address</li>
+                    <li>Wait a few minutes for the email to arrive</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <button
+                onClick={handleResendConfirmation}
+                disabled={loading}
+                className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Resend Confirmation Email</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowEmailConfirmation(false)}
+                className="w-full text-gray-600 hover:text-gray-800 py-2 transition-colors"
+              >
+                Back to {mode === 'login' ? 'Sign In' : 'Registration'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
